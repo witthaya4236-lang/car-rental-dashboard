@@ -237,8 +237,8 @@
                                 <input type="text" id="searchInput" onkeyup="renderTable()" placeholder="ค้นหาชื่อ, ทะเบียน..." class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition">
                                 <i class="fa-solid fa-search absolute left-3 top-3 text-gray-400"></i>
                             </div>
-                            <button onclick="exportExcel()" class="bg-emerald-50 text-emerald-600 px-4 py-2.5 rounded-xl font-bold hover:bg-emerald-100 transition border border-emerald-100 text-sm whitespace-nowrap">
-                                <i class="fa-solid fa-file-excel mr-1"></i> Excel
+                            <button onclick="exportExcel()" class="bg-emerald-50 text-emerald-600 px-4 py-2.5 rounded-xl font-bold hover:bg-emerald-100 transition border border-emerald-100 text-sm whitespace-nowrap shadow-sm">
+                                <i class="fa-solid fa-file-excel mr-2"></i> Export Excel
                             </button>
                         </div>
                     </div>
@@ -779,10 +779,73 @@
         }
 
         function exportExcel() {
-            const ws = XLSX.utils.json_to_sheet(rentals);
+            if(!rentals.length) return Swal.fire('No Data', 'ไม่มีข้อมูลให้ Export', 'warning');
+
+            // 1. Raw Data Sheet (ข้อมูลดิบ)
+            const ws_raw = XLSX.utils.json_to_sheet(rentals);
+
+            // 2. Process Weekly Summary (คำนวณรายรับรายสัปดาห์)
+            const weeklyData = {};
+
+            rentals.forEach(r => {
+                if (!r.start_date || r.start_date === '-') return;
+                
+                const date = new Date(r.start_date);
+                if (isNaN(date)) return;
+
+                // หาวันจันทร์ของสัปดาห์นั้นเพื่อใช้เป็น Key
+                const day = date.getDay();
+                const diff = date.getDate() - day + (day === 0 ? -6 : 1); // ถ้าวันอาทิตย์ให้ถอยไป 6 วัน
+                const monday = new Date(date.setDate(diff));
+                const weekKey = monday.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+
+                if (!weeklyData[weekKey]) {
+                    weeklyData[weekKey] = {
+                        'สัปดาห์ (เริ่มวันจันทร์)': weekKey,
+                        'จำนวนรายการ': 0,
+                        'ค่าเช่ารวม': 0,
+                        'มัดจำรวม': 0,
+                        'ยอดรวมสุทธิ': 0
+                    };
+                }
+
+                weeklyData[weekKey]['จำนวนรายการ']++;
+                weeklyData[weekKey]['ค่าเช่ารวม'] += (r.rental_fee || 0);
+                weeklyData[weekKey]['มัดจำรวม'] += (r.deposit || 0);
+                weeklyData[weekKey]['ยอดรวมสุทธิ'] += (r.total || 0);
+            });
+
+            // แปลง Object เป็น Array แล้วเรียงวันที่ล่าสุดขึ้นก่อน
+            const summaryArray = Object.values(weeklyData).sort((a, b) => 
+                new Date(b['สัปดาห์ (เริ่มวันจันทร์)']) - new Date(a['สัปดาห์ (เริ่มวันจันทร์)'])
+            );
+
+            // คำนวณยอดรวมทั้งหมด (Grand Total) บรรทัดสุดท้าย
+            if(summaryArray.length > 0) {
+                const grandTotal = summaryArray.reduce((acc, curr) => {
+                    acc['จำนวนรายการ'] += curr['จำนวนรายการ'];
+                    acc['ค่าเช่ารวม'] += curr['ค่าเช่ารวม'];
+                    acc['มัดจำรวม'] += curr['มัดจำรวม'];
+                    acc['ยอดรวมสุทธิ'] += curr['ยอดรวมสุทธิ'];
+                    return acc;
+                }, {
+                    'สัปดาห์ (เริ่มวันจันทร์)': 'รวมทั้งหมด (Grand Total)',
+                    'จำนวนรายการ': 0,
+                    'ค่าเช่ารวม': 0,
+                    'มัดจำรวม': 0,
+                    'ยอดรวมสุทธิ': 0
+                });
+                summaryArray.push(grandTotal);
+            }
+
+            const ws_summary = XLSX.utils.json_to_sheet(summaryArray);
+
+            // สร้าง Workbook และเพิ่มทั้ง 2 แผ่นงาน
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Rentals");
-            XLSX.writeFile(wb, "Rental_Cloud_Export.xlsx");
+            XLSX.utils.book_append_sheet(wb, ws_raw, "ข้อมูลดิบ (Raw Data)");
+            XLSX.utils.book_append_sheet(wb, ws_summary, "สรุปรายสัปดาห์ (Weekly)");
+
+            XLSX.writeFile(wb, `Rental_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
         }
 
         window.onload = checkAuth;
