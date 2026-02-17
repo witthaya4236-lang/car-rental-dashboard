@@ -81,11 +81,11 @@
             <form onsubmit="handleLogin(event)">
                 <div class="mb-4">
                     <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Username</label>
-                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="username" type="text" value="admin">
+                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="username" type="text" placeholder="ระบุชื่อผู้ใช้งาน">
                 </div>
                 <div class="mb-6">
                     <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Password</label>
-                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="password" type="password" value="1234">
+                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="password" type="password" placeholder="ระบุรหัสผ่าน">
                 </div>
                 <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-100 transition transform hover:-translate-y-0.5" type="submit">
                     เข้าใช้งานระบบ
@@ -157,54 +157,54 @@
             
             <!-- KPI Cards -->
             <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                <!-- 1. Revenue -->
+                <!-- 1. Grand Total -->
                 <div class="glass-panel p-5 relative overflow-hidden group border-l-4 border-indigo-500">
                     <div class="flex justify-between items-start">
                         <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">รายได้รวม</p>
-                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1" id="statIncome">0 ฿</h3>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">ยอดเงินรวม+บวกมัดจำ</p>
+                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1" id="statGrandTotal">0 ฿</h3>
                         </div>
-                        <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600"><i class="fa-solid fa-sack-dollar"></i></div>
+                        <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600"><i class="fa-solid fa-wallet"></i></div>
                     </div>
                 </div>
-                <!-- 2. Deposit -->
-                <div class="glass-panel p-5 relative overflow-hidden group border-l-4 border-rose-500">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">มัดจำคงค้าง</p>
-                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1" id="statDeposit">0 ฿</h3>
-                        </div>
-                        <div class="p-2 bg-rose-50 rounded-lg text-rose-500"><i class="fa-solid fa-hand-holding-dollar"></i></div>
-                    </div>
-                </div>
-                <!-- 3. Available -->
+                <!-- 2. Rental Fee -->
                 <div class="glass-panel p-5 relative overflow-hidden group border-l-4 border-emerald-500">
                     <div class="flex justify-between items-start">
                         <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">ว่างพร้อมเช่า</p>
-                            <h3 class="text-xl md:text-2xl font-bold text-emerald-600 mt-1" id="statAvailable">0</h3>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">ค่าเช่า (รวม)</p>
+                            <h3 class="text-xl md:text-2xl font-bold text-emerald-600 mt-1" id="statIncome">0 ฿</h3>
                         </div>
-                        <div class="p-2 bg-emerald-50 rounded-lg text-emerald-500"><i class="fa-solid fa-check"></i></div>
+                        <div class="p-2 bg-emerald-50 rounded-lg text-emerald-500"><i class="fa-solid fa-coins"></i></div>
+                    </div>
+                </div>
+                <!-- 3. Deposit -->
+                <div class="glass-panel p-5 relative overflow-hidden group border-l-4 border-rose-500">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">เงินมัดจำ (ที่ถืออยู่)</p>
+                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1" id="statDeposit">0 ฿</h3>
+                        </div>
+                        <div class="p-2 bg-rose-50 rounded-lg text-rose-500"><i class="fa-solid fa-hand-holding-dollar"></i></div>
                     </div>
                 </div>
                 <!-- 4. Active -->
                 <div class="glass-panel p-5 relative overflow-hidden group border-l-4 border-amber-400">
                     <div class="flex justify-between items-start">
                         <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">กำลังเช่า</p>
-                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1" id="statActive">0</h3>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">รถที่กำลังเช่าอยู่</p>
+                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1" id="statActive">0 คัน</h3>
                         </div>
-                        <div class="p-2 bg-amber-50 rounded-lg text-amber-500"><i class="fa-solid fa-clock"></i></div>
+                        <div class="p-2 bg-amber-50 rounded-lg text-amber-500"><i class="fa-solid fa-car-on"></i></div>
                     </div>
                 </div>
                 <!-- 5. Total -->
                 <div class="glass-panel p-5 relative overflow-hidden group border-l-4 border-blue-500">
                     <div class="flex justify-between items-start">
                         <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">รายการทั้งหมด</p>
-                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1" id="statTotal">0</h3>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">จำนวนการเช่าทั้งหมด</p>
+                            <h3 class="text-xl md:text-2xl font-bold text-gray-800 mt-1" id="statTotal">0 รายการ</h3>
                         </div>
-                        <div class="p-2 bg-blue-50 rounded-lg text-blue-500"><i class="fa-solid fa-list"></i></div>
+                        <div class="p-2 bg-blue-50 rounded-lg text-blue-500"><i class="fa-solid fa-list-check"></i></div>
                     </div>
                 </div>
             </div>
@@ -428,7 +428,7 @@
             e.preventDefault();
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
-            if(u === 'admin' && p === '1234') {
+            if(u === 'admin999' && p === '1234') {
                 sessionStorage.setItem('auth', 'true');
                 checkAuth();
             } else {
@@ -561,13 +561,13 @@
             const income = rentals.reduce((sum, r) => sum + (r.rental_fee || 0), 0);
             const deposit = rentals.filter(r => r.status !== 'คืนแล้ว').reduce((sum, r) => sum + (r.deposit || 0), 0);
             const active = rentals.filter(r => ['กำลังเช่า', 'จอง'].includes(r.status)).length;
-            const available = Math.max(0, rentals.length - active);
+            const grandTotal = income + deposit;
 
+            document.getElementById('statGrandTotal').innerText = grandTotal.toLocaleString() + ' ฿';
             document.getElementById('statIncome').innerText = income.toLocaleString() + ' ฿';
             document.getElementById('statDeposit').innerText = deposit.toLocaleString() + ' ฿';
             document.getElementById('statActive').innerText = active + ' คัน';
-            document.getElementById('statAvailable').innerText = available;
-            document.getElementById('statTotal').innerText = rentals.length;
+            document.getElementById('statTotal').innerText = rentals.length + ' รายการ';
 
             renderTable();
             renderCharts();
