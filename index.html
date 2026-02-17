@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการเช่ารถ - Supabase Cloud Storage</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f1f5f9; }
+        .glass-panel {
+            background: #ffffff;
+            border-radius: 1.25rem;
+            box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.07);
+            border: 1px solid #e2e8f0;
+        }
+        .status-pill {
+            padding: 4px 12px; border-radius: 9999px;
+            font-size: 0.7rem; font-weight: 700;
+        }
+        .license-plate {
+            font-weight: 700; color: #1e293b;
+            padding: 2px 8px; background: #f8fafc;
+            border: 1px solid #e2e8f0; border-radius: 6px;
+        }
+        .date-badge {
+            padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body class="text-slate-700">
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-100">
+        <div class="bg-white p-10 rounded-3xl shadow-xl w-full max-w-md mx-4 border border-gray-100">
+            <div class="text-center mb-10">
+                <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-indigo-50 text-indigo-600 mb-4">
+                    <i class="fa-solid fa-cloud text-4xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800">Cloud Rental System</h2>
+                <p class="text-slate-400 text-sm mt-1 uppercase tracking-widest">Supabase Login</p>
+            </div>
+            <form onsubmit="handleLogin(event)">
+                <div class="mb-5">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Username</label>
+                    <input class="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 px-4 outline-none focus:ring-2 focus:ring-indigo-500" id="username" type="text" value="admin999">
+                </div>
+                <div class="mb-8">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Password</label>
+                    <input class="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 px-4 outline-none focus:ring-2 focus:ring-indigo-500" id="password" type="password" placeholder="••••••••">
+                </div>
+                <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl shadow-lg transition transform active:scale-95" type="submit">เข้าสู่ระบบ</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboardContent" class="hidden">
+        <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+            <div class="max-w-full mx-auto px-6 lg:px-10 h-20 flex justify-between items-center">
+                <div class="flex items-center">
+                    <i class="fa-solid fa-car-side text-indigo-600 text-2xl mr-4"></i>
+                    <h1 class="text-xl font-bold">Rental <span class="text-indigo-600">Cloud</span></h1>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="openModal('add')" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center hover:bg-black transition">
+                        <i class="fa-solid fa-plus mr-2"></i> เพิ่มรายการ
+                    </button>
+                    <button onclick="toggleSettings()" class="bg-white border border-slate-200 p-2.5 rounded-xl text-slate-500 hover:text-indigo-600"><i class="fa-solid fa-gear"></i></button>
+                    <button onclick="fetchData()" id="refreshBtn" class="bg-indigo-600 text-white px-4 py-2.5 rounded-xl hover:bg-indigo-700 transition flex items-center text-sm">
+                        <i class="fa-solid fa-arrows-rotate mr-2"></i>รีเฟรช
+                    </button>
+                    <button onclick="logout()" class="text-slate-300 hover:text-rose-500 p-2 transition"><i class="fa-solid fa-power-off text-lg"></i></button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-full mx-auto px-6 lg:px-10 py-8">
+            <!-- KPI -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="glass-panel p-6">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">รายได้ค่าเช่ารวม</p>
+                    <h3 class="text-2xl font-bold text-emerald-600" id="netIncome">0 ฿</h3>
+                </div>
+                <div class="glass-panel p-6">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">ยอดเงินมัดจำรวม</p>
+                    <h3 class="text-2xl font-bold text-rose-500" id="totalDeposit">0 ฿</h3>
+                </div>
+                <div class="glass-panel p-6">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">กำลังเช่า</p>
+                    <h3 class="text-2xl font-bold" id="activeRentals">0 คัน</h3>
+                </div>
+                <div class="glass-panel p-6">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">รายการทั้งหมด</p>
+                    <h3 class="text-2xl font-bold" id="totalTransactions">0 รายการ</h3>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div class="glass-panel p-6 lg:col-span-2">
+                    <h3 class="font-bold text-slate-700 mb-4">รายได้ตามรุ่นรถ</h3>
+                    <div class="h-64"><canvas id="revenueChart"></canvas></div>
+                </div>
+                <div class="glass-panel p-6">
+                    <h3 class="font-bold text-slate-700 mb-4 text-center">สัดส่วนสถานะ</h3>
+                    <div class="h-64"><canvas id="statusChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="glass-panel p-6">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <h3 class="font-bold text-slate-800 text-lg">รายการจัดการเช่ารถ (Real-time)</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="searchInput" onkeyup="renderTable()" placeholder="ค้นหา..." class="border border-slate-200 rounded-full px-4 py-2 text-sm w-64 outline-none focus:ring-2 focus:ring-indigo-500">
+                        <button onclick="exportExcel()" class="bg-emerald-600 text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-emerald-700"><i class="fa-solid fa-file-excel mr-1"></i> Export</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left" id="mainTable">
+                        <thead>
+                            <tr class="text-slate-400 text-[11px] uppercase border-b border-slate-100">
+                                <th class="pb-4 px-2">รุ่นรถ</th>
+                                <th class="pb-4 px-2">ทะเบียน</th>
+                                <th class="pb-4 px-2">ลูกค้า</th>
+                                <th class="pb-4 px-2">วันเช่า-คืน</th>
+                                <th class="pb-4 px-2 text-center">จำนวนวัน</th>
+                                <th class="pb-4 px-2 text-right">ค่าเช่า</th>
+                                <th class="pb-4 px-2 text-right">มัดจำ</th>
+                                <th class="pb-4 px-2 text-center">สถานะ</th>
+                                <th class="pb-4 px-2 text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="text-sm">
+                            <!-- Data will appear here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Settings Modal (Supabase Config) -->
+    <div id="settingsModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-md p-8 rounded-2xl shadow-2xl">
+            <h3 class="text-lg font-bold mb-6 flex items-center"><i class="fa-solid fa-database mr-2 text-indigo-500"></i> ตั้งค่าการเชื่อมต่อ Cloud</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">SUPABASE URL</label>
+                    <input type="text" id="sbUrl" class="w-full bg-slate-50 border rounded-xl p-3 text-sm" placeholder="https://xxx.supabase.co">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">SUPABASE ANON KEY</label>
+                    <input type="text" id="sbKey" class="w-full bg-slate-50 border rounded-xl p-3 text-sm" placeholder="eyJhbGciOiJIUzI1NiI...">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-8">
+                <button onclick="toggleSettings()" class="text-slate-400 font-bold px-4">ยกเลิก</button>
+                <button onclick="saveSettings()" class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold">บันทึก</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CRUD Modal -->
+    <div id="crudModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-4xl p-10 rounded-3xl shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex justify-between items-center mb-8 pb-4 border-b">
+                <h3 id="modalTitle" class="text-xl font-bold">รายละเอียดการเช่า</h3>
+                <button onclick="closeModal()" class="text-slate-300 hover:text-rose-500"><i class="fa-solid fa-xmark text-2xl"></i></button>
+            </div>
+            <form id="crudForm" onsubmit="handleFormSubmit(event)" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <input type="hidden" id="formId">
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">รุ่นรถ</label><input type="text" id="formModel" required class="w-full bg-slate-50 border p-3 rounded-xl text-sm"></div>
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">ทะเบียน</label><input type="text" id="formPlate" required class="w-full bg-slate-50 border p-3 rounded-xl text-sm"></div>
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">สีรถ</label><input type="text" id="formColor" class="w-full bg-slate-50 border p-3 rounded-xl text-sm"></div>
+                
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">ชื่อลูกค้า</label><input type="text" id="formCustomer" required class="w-full bg-slate-50 border p-3 rounded-xl text-sm"></div>
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">เบอร์โทร</label><input type="text" id="formPhone" required class="w-full bg-slate-50 border p-3 rounded-xl text-sm"></div>
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">หมวก</label><input type="text" id="formHelmet" class="w-full bg-slate-50 border p-3 rounded-xl text-sm"></div>
+
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">วันที่เช่า</label><input type="date" id="formStartDate" onchange="calcDuration()" class="w-full bg-slate-50 border p-3 rounded-xl text-sm"></div>
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">วันที่คืน</label><input type="date" id="formEndDate" onchange="calcDuration()" class="w-full bg-slate-50 border p-3 rounded-xl text-sm"></div>
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">จำนวนวัน</label><input type="number" id="formDuration" readonly class="w-full bg-gray-100 border p-3 rounded-xl text-sm"></div>
+
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">ค่าเช่า</label><input type="number" id="formRentalFee" oninput="calcTotal()" class="w-full bg-slate-50 border p-3 rounded-xl text-sm"></div>
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">มัดจำ</label><input type="number" id="formDeposit" oninput="calcTotal()" class="w-full bg-slate-50 border p-3 rounded-xl text-sm"></div>
+                <div><label class="block text-xs font-bold text-slate-500 mb-1">รวมเงิน</label><input type="number" id="formTotal" readonly class="w-full bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold p-3 rounded-xl text-sm"></div>
+                
+                <div class="md:col-span-1">
+                    <label class="block text-xs font-bold text-slate-500 mb-1">สถานะ</label>
+                    <select id="formStatus" class="w-full bg-slate-50 border p-3 rounded-xl text-sm">
+                        <option value="กำลังเช่า">กำลังเช่า</option>
+                        <option value="คืนแล้ว">คืนแล้ว</option>
+                        <option value="จอง">จอง</option>
+                    </select>
+                </div>
+
+                <div class="md:col-span-3 pt-6 border-t flex justify-end gap-3">
+                    <button type="button" onclick="closeModal()" class="px-6 py-2 text-slate-400 font-bold">ยกเลิก</button>
+                    <button type="submit" class="bg-indigo-600 text-white px-10 py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg">บันทึกข้อมูล</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let supabaseClient = null;
+        let rawData = [];
+        let charts = {};
+
+        // Authentication
+        function handleLogin(e) {
+            e.preventDefault();
+            if (document.getElementById('username').value === 'admin999' && document.getElementById('password').value === '0123456789') {
+                sessionStorage.setItem('isAuth', 'true');
+                initApp();
+            } else {
+                Swal.fire('Error', 'Username หรือ Password ไม่ถูกต้อง', 'error');
+            }
+        }
+
+        function logout() {
+            sessionStorage.removeItem('isAuth');
+            location.reload();
+        }
+
+        // Initialize App
+        function initApp() {
+            if (sessionStorage.getItem('isAuth') !== 'true') return;
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('dashboardContent').classList.remove('hidden');
+
+            const savedUrl = localStorage.getItem('sbUrl');
+            const savedKey = localStorage.getItem('sbKey');
+            
+            if (savedUrl && savedKey) {
+                document.getElementById('sbUrl').value = savedUrl;
+                document.getElementById('sbKey').value = savedKey;
+                supabaseClient = supabase.createClient(savedUrl, savedKey);
+                fetchData();
+            } else {
+                toggleSettings();
+            }
+        }
+
+        // Database Operations
+        async function fetchData() {
+            if (!supabaseClient) return;
+            const btn = document.getElementById('refreshBtn');
+            btn.classList.add('opacity-50');
+            
+            const { data, error } = await supabaseClient
+                .from('rentals')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                Swal.fire('Error', 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้: ' + error.message, 'error');
+            } else {
+                rawData = data;
+                updateUI();
+            }
+            btn.classList.remove('opacity-50');
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('formId').value;
+            const payload = {
+                model: document.getElementById('formModel').value,
+                plate: document.getElementById('formPlate').value,
+                color: document.getElementById('formColor').value,
+                customer: document.getElementById('formCustomer').value,
+                phone: document.getElementById('formPhone').value,
+                helmet: document.getElementById('formHelmet').value,
+                start_date: document.getElementById('formStartDate').value,
+                end_date: document.getElementById('formEndDate').value,
+                duration: parseInt(document.getElementById('formDuration').value) || 0,
+                rental_fee: parseFloat(document.getElementById('formRentalFee').value) || 0,
+                deposit: parseFloat(document.getElementById('formDeposit').value) || 0,
+                total: parseFloat(document.getElementById('formTotal').value) || 0,
+                status: document.getElementById('formStatus').value
+            };
+
+            let res;
+            if (id) {
+                res = await supabaseClient.from('rentals').update(payload).eq('id', id);
+            } else {
+                res = await supabaseClient.from('rentals').insert([payload]);
+            }
+
+            if (res.error) {
+                Swal.fire('Error', res.error.message, 'error');
+            } else {
+                Swal.fire({ icon: 'success', title: 'สำเร็จ', timer: 1000, showConfirmButton: false });
+                closeModal();
+                fetchData();
+            }
+        }
+
+        async function deleteItem(id) {
+            const res = await Swal.fire({ title: 'ยืนยัน?', text: 'ลบข้อมูลถาวร?', icon: 'warning', showCancelButton: true });
+            if (res.isConfirmed) {
+                const { error } = await supabaseClient.from('rentals').delete().eq('id', id);
+                if (error) Swal.fire('Error', error.message, 'error');
+                else fetchData();
+            }
+        }
+
+        // UI Helpers
+        function updateUI() {
+            const income = rawData.reduce((a, b) => a + (b.rental_fee || 0), 0);
+            const deposit = rawData.reduce((a, b) => (b.status !== 'คืนแล้ว' ? a + (b.deposit || 0) : a), 0);
+            const active = rawData.filter(r => r.status === 'กำลังเช่า').length;
+
+            document.getElementById('netIncome').innerText = income.toLocaleString() + ' ฿';
+            document.getElementById('totalDeposit').innerText = deposit.toLocaleString() + ' ฿';
+            document.getElementById('activeRentals').innerText = active + ' คัน';
+            document.getElementById('totalTransactions').innerText = rawData.length;
+
+            renderTable();
+            renderCharts();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            tbody.innerHTML = '';
+
+            const filtered = rawData.filter(r => 
+                (r.model + r.plate + r.customer).toLowerCase().includes(search)
+            );
+
+            filtered.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 border-b border-slate-50';
+                
+                let sClass = 'bg-gray-100 text-gray-600';
+                if (item.status === 'คืนแล้ว') sClass = 'bg-emerald-100 text-emerald-700';
+                if (item.status === 'กำลังเช่า') sClass = 'bg-amber-100 text-amber-700';
+
+                tr.innerHTML = `
+                    <td class="py-4 px-2 font-bold">${item.model}</td>
+                    <td class="py-4 px-2"><span class="license-plate">${item.plate}</span></td>
+                    <td class="py-4 px-2">${item.customer}</td>
+                    <td class="py-4 px-2">
+                        <div class="flex items-center gap-1">
+                            <span class="text-emerald-600 font-bold">${item.start_date || '-'}</span>
+                            <span class="text-rose-500 font-bold">${item.end_date || '-'}</span>
+                        </div>
+                    </td>
+                    <td class="py-4 px-2 text-center font-bold">${item.duration} วัน</td>
+                    <td class="py-4 px-2 text-right font-bold">${(item.rental_fee || 0).toLocaleString()}</td>
+                    <td class="py-4 px-2 text-right font-bold text-rose-400">${(item.deposit || 0).toLocaleString()}</td>
+                    <td class="py-4 px-2 text-center"><span class="status-pill ${sClass}">${item.status}</span></td>
+                    <td class="py-4 px-2 text-center">
+                        <button onclick='openModal("edit", ${JSON.stringify(item)})' class="text-indigo-400 hover:text-indigo-600 mx-1"><i class="fa-solid fa-edit"></i></button>
+                        <button onclick="deleteItem('${item.id}')" class="text-rose-300 hover:text-rose-500 mx-1"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderCharts() {
+            if (charts.rev) charts.rev.destroy();
+            if (charts.stat) charts.stat.destroy();
+
+            const stats = {};
+            const statuses = {};
+            rawData.forEach(r => {
+                stats[r.model] = (stats[r.model] || 0) + (r.rental_fee || 0);
+                statuses[r.status] = (statuses[r.status] || 0) + 1;
+            });
+
+            charts.rev = new Chart(document.getElementById('revenueChart'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(stats),
+                    datasets: [{ label: 'รายได้', data: Object.values(stats), backgroundColor: '#6366f1', borderRadius: 8 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            charts.stat = new Chart(document.getElementById('statusChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statuses),
+                    datasets: [{ data: Object.values(statuses), backgroundColor: ['#fbbf24', '#10b981', '#3b82f6'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '70%' }
+            });
+        }
+
+        // Logic Helpers
+        function calcDuration() {
+            const start = new Date(document.getElementById('formStartDate').value);
+            const end = new Date(document.getElementById('formEndDate').value);
+            if (!isNaN(start) && !isNaN(end)) {
+                const diff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+                document.getElementById('formDuration').value = diff > 0 ? diff : 1;
+            }
+        }
+
+        function calcTotal() {
+            const fee = parseFloat(document.getElementById('formRentalFee').value) || 0;
+            const dep = parseFloat(document.getElementById('formDeposit').value) || 0;
+            document.getElementById('formTotal').value = fee + dep;
+        }
+
+        function openModal(mode, item = null) {
+            document.getElementById('crudModal').classList.remove('hidden');
+            document.getElementById('crudForm').reset();
+            document.getElementById('formId').value = "";
+            document.getElementById('modalTitle').innerText = mode === 'add' ? "เพิ่มรายการใหม่" : "แก้ไขข้อมูลการเช่า";
+
+            if (item) {
+                document.getElementById('formId').value = item.id;
+                document.getElementById('formModel').value = item.model;
+                document.getElementById('formPlate').value = item.plate;
+                document.getElementById('formColor').value = item.color;
+                document.getElementById('formCustomer').value = item.customer;
+                document.getElementById('formPhone').value = item.phone;
+                document.getElementById('formHelmet').value = item.helmet;
+                document.getElementById('formStartDate').value = item.start_date;
+                document.getElementById('formEndDate').value = item.end_date;
+                document.getElementById('formDuration').value = item.duration;
+                document.getElementById('formRentalFee').value = item.rental_fee;
+                document.getElementById('formDeposit').value = item.deposit;
+                document.getElementById('formTotal').value = item.total;
+                document.getElementById('formStatus').value = item.status;
+            }
+        }
+
+        function closeModal() { document.getElementById('crudModal').classList.add('hidden'); }
+        function toggleSettings() { document.getElementById('settingsModal').classList.toggle('hidden'); }
+
+        function saveSettings() {
+            const url = document.getElementById('sbUrl').value;
+            const key = document.getElementById('sbKey').value;
+            localStorage.setItem('sbUrl', url);
+            localStorage.setItem('sbKey', key);
+            location.reload();
+        }
+
+        function exportExcel() {
+            const ws = XLSX.utils.json_to_sheet(rawData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "RentalData");
+            XLSX.writeFile(wb, "Rental_Export.xlsx");
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
