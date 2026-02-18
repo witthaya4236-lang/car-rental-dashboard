@@ -80,14 +80,14 @@
             </div>
             <form onsubmit="handleLogin(event)">
                 <div class="mb-4">
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Username</label>
-                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="username" type="text" placeholder="ระบุชื่อผู้ใช้งาน">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Email</label>
+                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="username" type="text" placeholder="name@example.com">
                 </div>
                 <div class="mb-6">
                     <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Password</label>
-                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="password" type="password" placeholder="ระบุรหัสผ่าน">
+                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="password" type="password" placeholder="••••••••">
                 </div>
-                <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-100 transition transform hover:-translate-y-0.5" type="submit">
+                <button id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-100 transition transform hover:-translate-y-0.5" type="submit">
                     เข้าใช้งานระบบ
                 </button>
             </form>
@@ -121,13 +121,35 @@
                             <i class="fa-solid fa-database text-lg"></i>
                         </button>
 
-                        <!-- Notification Button -->
+                        <!-- Notification -->
                         <div class="relative">
                             <button onclick="toggleNotifications()" class="p-2 text-gray-400 hover:text-indigo-600 transition rounded-lg hover:bg-gray-50 relative z-50">
                                 <i class="fa-solid fa-bell text-lg"></i>
                                 <span id="notifyBadge" class="hidden absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white"></span>
                                 <span id="notifyPing" class="hidden absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-400 animate-ping-slow"></span>
                             </button>
+                            
+                            <!-- Dropdown: FIXED INSET-0 for Mobile to ensure FULL SCREEN overlay -->
+                            <div id="notificationDropdown" class="hidden fixed inset-0 z-[2000] bg-white flex flex-col md:fixed md:inset-auto md:top-20 md:right-4 md:w-[420px] md:h-auto md:max-h-[600px] md:rounded-2xl md:shadow-2xl md:border md:border-gray-100 transform origin-top-right transition-all">
+                                
+                                <!-- Header -->
+                                <div class="px-6 py-5 bg-white border-b border-gray-100 flex justify-between items-center shadow-sm flex-shrink-0">
+                                    <div>
+                                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                            <i class="fa-solid fa-bell text-indigo-500"></i> แจ้งเตือนคืนรถ
+                                        </h3>
+                                        <div class="text-xs text-gray-400 mt-0.5" id="notifyDate"></div>
+                                    </div>
+                                    <button onclick="toggleNotifications()" class="w-9 h-9 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 hover:text-red-500 transition shadow-sm">
+                                        <i class="fa-solid fa-xmark text-lg"></i>
+                                    </button>
+                                </div>
+
+                                <!-- List Container -->
+                                <div id="notificationList" class="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-3 md:max-h-[500px]">
+                                    <!-- Dynamic Content Here -->
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Refresh -->
@@ -462,43 +484,52 @@
         let rentals = [];
         let charts = {};
 
+        // Initialize Supabase Client Immediately
+        try {
+            const storedUrl = localStorage.getItem('sb_url');
+            const storedKey = localStorage.getItem('sb_key');
+            // Prefer stored, fallback to config
+            const url = storedUrl || CONFIG.URL;
+            const key = storedKey || CONFIG.KEY;
+            
+            if (url && key) {
+                supabaseClient = supabase.createClient(url, key);
+            }
+        } catch (e) {
+            console.error("Init Error:", e);
+        }
+
         function checkAuth() {
             if(sessionStorage.getItem('auth') === 'true') {
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('dashboardContent').classList.remove('hidden');
-                initSupabase();
+                fetchData(); // Fetch data immediately
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
                 document.getElementById('dashboardContent').classList.add('hidden');
-                // เตรียม Supabase Client ให้พร้อมสำหรับการล็อกอิน (แม้ยังไม่เข้าสู่ระบบ)
-                if (!supabaseClient) {
-                    const url = localStorage.getItem('sb_url') || CONFIG.URL;
-                    const key = localStorage.getItem('sb_key') || CONFIG.KEY;
-                    if (url && key) supabaseClient = supabase.createClient(url, key);
-                }
             }
         }
 
         async function handleLogin(e) {
             e.preventDefault();
-            // รับค่าจากช่อง Username (Email) และ Password ที่คุณกรอกหน้าเว็บ
             const email = document.getElementById('username').value; 
             const password = document.getElementById('password').value;
+            const btn = document.getElementById('loginBtn');
+            const originalText = btn.innerHTML;
 
-            // ตรวจสอบว่า Supabase Client ถูกสร้างหรือยัง
-            if (!supabaseClient) {
-                const url = localStorage.getItem('sb_url') || CONFIG.URL;
-                const key = localStorage.getItem('sb_key') || CONFIG.KEY;
-                if (url && key) {
-                    supabaseClient = supabase.createClient(url, key);
-                } else {
-                    Swal.fire('Config Error', 'ไม่พบการตั้งค่าเชื่อมต่อฐานข้อมูล', 'error');
-                    return;
-                }
+            if (!email || !password) {
+                Swal.fire({ icon: 'warning', title: 'แจ้งเตือน', text: 'กรุณากรอก Email และ Password' });
+                return;
             }
 
-            // ส่งข้อมูลไปยืนยันตัวตนกับระบบ Authentication ของ Supabase
-            // เพื่อให้ฐานข้อมูลอนุญาตให้เราใช้งานตามสิทธิ์ใน Policy "Admin Full Access"
+            if (!supabaseClient) {
+                Swal.fire({ icon: 'error', title: 'Connection Error', text: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' });
+                return;
+            }
+
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> กำลังตรวจสอบ...';
+            btn.disabled = true;
+
             try {
                 const { data, error } = await supabaseClient.auth.signInWithPassword({
                     email: email,
@@ -506,53 +537,37 @@
                 });
 
                 if (error) {
-                    // ถ้าล็อกอินไม่สำเร็จ (เช่น รหัสผิด) จะแสดงข้อความเตือน
-                    Swal.fire('เข้าสู่ระบบไม่สำเร็จ', error.message, 'error');
+                    Swal.fire({ icon: 'error', title: 'Login Failed', text: error.message || 'รหัสผ่านไม่ถูกต้อง' });
                 } else {
-                    // ถ้าสำเร็จ จะเก็บสถานะไว้ใน Session และเข้าสู่หน้า Dashboard
                     sessionStorage.setItem('auth', 'true');
-                    checkAuth();
+                    
                     Swal.fire({ 
                         icon: 'success', 
                         title: 'เข้าสู่ระบบสำเร็จ', 
-                        text: 'ยินดีต้อนรับคุณวิทยะ', 
                         timer: 1500, 
                         showConfirmButton: false 
+                    }).then(() => {
+                        checkAuth();
                     });
                 }
             } catch (err) {
-                Swal.fire('Error', 'เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + err.message, 'error');
+                Swal.fire('Error', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
             }
         }
 
         function logout() {
             sessionStorage.removeItem('auth');
+            if (supabaseClient) supabaseClient.auth.signOut();
             location.reload();
         }
 
         // --- SUPABASE LOGIC ---
+        // (Re-init logic for settings modal update)
         function initSupabase() {
-            // Priority: LocalStorage > Hardcoded Config
-            let url = localStorage.getItem('sb_url');
-            let key = localStorage.getItem('sb_key');
-
-            // If local storage is empty, use Hardcoded Config
-            if (!url || !key) {
-                url = CONFIG.URL;
-                key = CONFIG.KEY;
-            }
-
-            if(url && key) {
-                try {
-                    supabaseClient = supabase.createClient(url, key);
-                    fetchData();
-                } catch(e) {
-                    Swal.fire('Config Error', 'การตั้งค่า URL ไม่ถูกต้อง', 'error');
-                    toggleSettings();
-                }
-            } else {
-                toggleSettings();
-            }
+           // handled globally now
         }
 
         function toggleSettings() {
@@ -570,8 +585,12 @@
             if(url && key) {
                 localStorage.setItem('sb_url', url);
                 localStorage.setItem('sb_key', key);
+                
+                // Re-init
+                supabaseClient = supabase.createClient(url, key);
+                
                 toggleSettings();
-                location.reload(); // Reload to re-init
+                Swal.fire({ icon: 'success', title: 'บันทึกสำเร็จ', timer: 1000, showConfirmButton: false});
             }
         }
 
@@ -590,13 +609,7 @@
 
             if(error) {
                 console.error(error);
-                // Don't alert connection error if it might be just empty table or RLS, but here we assume general error
-                Swal.fire({
-                    title: 'เชื่อมต่อไม่ได้',
-                    text: 'กรุณาตรวจสอบ Key หรือ Table Name (ลองกดตั้งค่ารูปเฟือง)',
-                    icon: 'error',
-                    footer: '<a href="#" onclick="toggleSettings()">แก้ไขการเชื่อมต่อ</a>'
-                });
+                // Silent fail to avoid alert loop if not logged in
             } else {
                 rentals = data || [];
                 updateDashboard();
@@ -1092,4 +1105,3 @@
     </script>
 </body>
 </html>
-
