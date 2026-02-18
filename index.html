@@ -80,14 +80,14 @@
             </div>
             <form onsubmit="handleLogin(event)">
                 <div class="mb-4">
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Email</label>
-                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="username" type="text" placeholder="name@example.com">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Username</label>
+                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="username" type="text" placeholder="ระบุชื่อผู้ใช้งาน">
                 </div>
                 <div class="mb-6">
                     <label class="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Password</label>
-                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="password" type="password" placeholder="••••••••">
+                    <input class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" id="password" type="password" placeholder="ระบุรหัสผ่าน">
                 </div>
-                <button id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-100 transition transform hover:-translate-y-0.5" type="submit">
+                <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-100 transition transform hover:-translate-y-0.5" type="submit">
                     เข้าใช้งานระบบ
                 </button>
             </form>
@@ -121,35 +121,13 @@
                             <i class="fa-solid fa-database text-lg"></i>
                         </button>
 
-                        <!-- Notification -->
+                        <!-- Notification Button -->
                         <div class="relative">
                             <button onclick="toggleNotifications()" class="p-2 text-gray-400 hover:text-indigo-600 transition rounded-lg hover:bg-gray-50 relative z-50">
                                 <i class="fa-solid fa-bell text-lg"></i>
                                 <span id="notifyBadge" class="hidden absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white"></span>
                                 <span id="notifyPing" class="hidden absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-400 animate-ping-slow"></span>
                             </button>
-                            
-                            <!-- Dropdown: FIXED INSET-0 for Mobile to ensure FULL SCREEN overlay -->
-                            <div id="notificationDropdown" class="hidden fixed inset-0 z-[2000] bg-white flex flex-col md:fixed md:inset-auto md:top-20 md:right-4 md:w-[420px] md:h-auto md:max-h-[600px] md:rounded-2xl md:shadow-2xl md:border md:border-gray-100 transform origin-top-right transition-all">
-                                
-                                <!-- Header -->
-                                <div class="px-6 py-5 bg-white border-b border-gray-100 flex justify-between items-center shadow-sm flex-shrink-0">
-                                    <div>
-                                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                                            <i class="fa-solid fa-bell text-indigo-500"></i> แจ้งเตือนคืนรถ
-                                        </h3>
-                                        <div class="text-xs text-gray-400 mt-0.5" id="notifyDate"></div>
-                                    </div>
-                                    <button onclick="toggleNotifications()" class="w-9 h-9 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 hover:text-red-500 transition shadow-sm">
-                                        <i class="fa-solid fa-xmark text-lg"></i>
-                                    </button>
-                                </div>
-
-                                <!-- List Container -->
-                                <div id="notificationList" class="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-3 md:max-h-[500px]">
-                                    <!-- Dynamic Content Here -->
-                                </div>
-                            </div>
                         </div>
 
                         <!-- Refresh -->
@@ -479,95 +457,75 @@
             KEY: 'sb_publishable_wEZydpOBx6p0tWwikplUYw_-OBrj9y8'
         };
 
+        // --- SECURITY: XSS Prevention Helper ---
+        // แปลงตัวอักษรพิเศษเป็น HTML Entities เพื่อป้องกันการรันสคริปต์อันตราย
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         // --- AUTH & INIT ---
         let supabaseClient = null;
         let rentals = [];
         let charts = {};
 
-        // Initialize Supabase Client Immediately
-        try {
-            const storedUrl = localStorage.getItem('sb_url');
-            const storedKey = localStorage.getItem('sb_key');
-            // Prefer stored, fallback to config
-            const url = storedUrl || CONFIG.URL;
-            const key = storedKey || CONFIG.KEY;
-            
-            if (url && key) {
-                supabaseClient = supabase.createClient(url, key);
-            }
-        } catch (e) {
-            console.error("Init Error:", e);
-        }
-
         function checkAuth() {
             if(sessionStorage.getItem('auth') === 'true') {
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('dashboardContent').classList.remove('hidden');
-                fetchData(); // Fetch data immediately
+                initSupabase();
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
                 document.getElementById('dashboardContent').classList.add('hidden');
             }
         }
 
-        async function handleLogin(e) {
+        function handleLogin(e) {
             e.preventDefault();
-            const email = document.getElementById('username').value; 
-            const password = document.getElementById('password').value;
-            const btn = document.getElementById('loginBtn');
-            const originalText = btn.innerHTML;
-
-            if (!email || !password) {
-                Swal.fire({ icon: 'warning', title: 'แจ้งเตือน', text: 'กรุณากรอก Email และ Password' });
-                return;
-            }
-
-            if (!supabaseClient) {
-                Swal.fire({ icon: 'error', title: 'Connection Error', text: 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้' });
-                return;
-            }
-
-            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> กำลังตรวจสอบ...';
-            btn.disabled = true;
-
-            try {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({
-                    email: email,
-                    password: password,
-                });
-
-                if (error) {
-                    Swal.fire({ icon: 'error', title: 'Login Failed', text: error.message || 'รหัสผ่านไม่ถูกต้อง' });
-                } else {
-                    sessionStorage.setItem('auth', 'true');
-                    
-                    Swal.fire({ 
-                        icon: 'success', 
-                        title: 'เข้าสู่ระบบสำเร็จ', 
-                        timer: 1500, 
-                        showConfirmButton: false 
-                    }).then(() => {
-                        checkAuth();
-                    });
-                }
-            } catch (err) {
-                Swal.fire('Error', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
-            } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            // Admin logic (you can change this)
+            if(u === 'admin999' && p === '1234') {
+                sessionStorage.setItem('auth', 'true');
+                checkAuth();
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Username/Password ผิดพลาด', confirmButtonColor: '#4f46e5' });
             }
         }
 
         function logout() {
             sessionStorage.removeItem('auth');
-            if (supabaseClient) supabaseClient.auth.signOut();
             location.reload();
         }
 
         // --- SUPABASE LOGIC ---
-        // (Re-init logic for settings modal update)
         function initSupabase() {
-           // handled globally now
+            // Priority: LocalStorage > Hardcoded Config
+            let url = localStorage.getItem('sb_url');
+            let key = localStorage.getItem('sb_key');
+
+            // If local storage is empty, use Hardcoded Config
+            if (!url || !key) {
+                url = CONFIG.URL;
+                key = CONFIG.KEY;
+            }
+
+            if(url && key) {
+                try {
+                    supabaseClient = supabase.createClient(url, key);
+                    fetchData();
+                } catch(e) {
+                    Swal.fire('Config Error', 'การตั้งค่า URL ไม่ถูกต้อง', 'error');
+                    toggleSettings();
+                }
+            } else {
+                toggleSettings();
+            }
         }
 
         function toggleSettings() {
@@ -585,12 +543,8 @@
             if(url && key) {
                 localStorage.setItem('sb_url', url);
                 localStorage.setItem('sb_key', key);
-                
-                // Re-init
-                supabaseClient = supabase.createClient(url, key);
-                
                 toggleSettings();
-                Swal.fire({ icon: 'success', title: 'บันทึกสำเร็จ', timer: 1000, showConfirmButton: false});
+                location.reload(); // Reload to re-init
             }
         }
 
@@ -609,7 +563,13 @@
 
             if(error) {
                 console.error(error);
-                // Silent fail to avoid alert loop if not logged in
+                // Don't alert connection error if it might be just empty table or RLS, but here we assume general error
+                Swal.fire({
+                    title: 'เชื่อมต่อไม่ได้',
+                    text: 'กรุณาตรวจสอบ Key หรือ Table Name (ลองกดตั้งค่ารูปเฟือง)',
+                    icon: 'error',
+                    footer: '<a href="#" onclick="toggleSettings()">แก้ไขการเชื่อมต่อ</a>'
+                });
             } else {
                 rentals = data || [];
                 updateDashboard();
@@ -724,17 +684,19 @@
 
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50 transition-colors border-b border-gray-50 last:border-0';
+                
+                // ปรับปรุงการแสดงผลโดยใช้ escapeHTML ป้องกัน XSS
                 tr.innerHTML = `
                     <td class="px-4 py-4 whitespace-nowrap text-center text-gray-400 font-medium">${index + 1}</td>
-                    <td class="px-4 py-4 whitespace-nowrap font-bold text-gray-700">${r.model}</td>
-                    <td class="px-4 py-4 whitespace-nowrap text-center"><span class="license-plate">${r.plate}</span></td>
+                    <td class="px-4 py-4 whitespace-nowrap font-bold text-gray-700">${escapeHTML(r.model)}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-center"><span class="license-plate">${escapeHTML(r.plate)}</span></td>
                     <td class="px-4 py-4 whitespace-nowrap text-center">
                         <span class="inline-flex items-center px-2 py-1 rounded-full bg-slate-100 border border-slate-200 text-xs text-gray-600">
-                            <span class="color-dot" style="background-color: ${colorCode}; ${isWhite ? 'border: 1px solid #d1d5db;' : ''}"></span>${r.color}
+                            <span class="color-dot" style="background-color: ${colorCode}; ${isWhite ? 'border: 1px solid #d1d5db;' : ''}"></span>${escapeHTML(r.color)}
                         </span>
                     </td>
-                    <td class="px-4 py-4 whitespace-nowrap font-medium text-gray-800">${r.customer}</td>
-                    <td class="px-4 py-4 whitespace-nowrap text-center text-gray-500 text-xs"><i class="fa-solid fa-phone mr-1"></i>${r.phone}</td>
+                    <td class="px-4 py-4 whitespace-nowrap font-medium text-gray-800">${escapeHTML(r.customer)}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-center text-gray-500 text-xs"><i class="fa-solid fa-phone mr-1"></i>${escapeHTML(r.phone)}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-center text-xs">
                         <div class="flex items-center justify-center gap-1">
                             <span class="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">${formatDate(r.start_date)}</span>
@@ -743,18 +705,22 @@
                         </div>
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-center text-indigo-600 font-bold">${r.duration} วัน</td>
-                    <td class="px-4 py-4 whitespace-nowrap text-center text-gray-500">${r.helmet}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-center text-gray-500">${escapeHTML(r.helmet)}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-center font-medium text-gray-700">${(r.rental_fee || 0).toLocaleString()}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-center text-rose-500 font-medium">${(r.deposit || 0).toLocaleString()}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-center font-bold text-indigo-900">${(r.total || 0).toLocaleString()}</td>
-                    <td class="px-4 py-4 whitespace-nowrap text-center text-gray-500 text-xs max-w-[150px] truncate" title="${r.remark || ''}">${r.remark || '-'}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-center text-gray-500 text-xs max-w-[150px] truncate" title="${escapeHTML(r.remark || '')}">${escapeHTML(r.remark || '-')}</td>
                     <td class="px-4 py-4 whitespace-nowrap text-center">
-                        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${r.status}</span>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${escapeHTML(r.status)}</span>
                     </td>
                     <td class="px-4 py-4 whitespace-nowrap text-center">
                         <div class="flex items-center justify-center gap-1">
-                            <button onclick='openModal("edit", ${JSON.stringify(r)})' class="p-1.5 rounded-lg text-indigo-400 hover:bg-indigo-50 hover:text-indigo-600 transition"><i class="fa-solid fa-pen"></i></button>
-                            <button onclick="deleteItem('${r.id}')" class="p-1.5 rounded-lg text-rose-300 hover:bg-rose-50 hover:text-rose-500 transition"><i class="fa-solid fa-trash"></i></button>
+                            <button onclick='openModal("edit", ${JSON.stringify(r).replace(/'/g, "\\'")})' class="p-1.5 rounded-lg text-indigo-400 hover:bg-indigo-50 hover:text-indigo-600 transition">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            <button onclick="deleteItem('${r.id}')" class="p-1.5 rounded-lg text-rose-300 hover:bg-rose-50 hover:text-rose-500 transition">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
                         </div>
                     </td>
                 `;
@@ -772,7 +738,7 @@
             charts.rev = new Chart(document.getElementById('revenueChart'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(revData),
+                    labels: Object.keys(revData).map(label => escapeHTML(label)),
                     datasets: [{ label: 'รายได้', data: Object.values(revData), backgroundColor: '#6366f1', borderRadius: 6 }]
                 },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
@@ -817,7 +783,7 @@
                 calcDays();
             } else {
                 title.innerHTML = '<i class="fa-solid fa-pen-to-square text-indigo-500 mr-2"></i> แก้ไขข้อมูล';
-                // Fill form
+                // Fill form (ค่าที่ใส่ใน input ตรงๆ จะถูกมองเป็น text ธรรมดาโดยเบราว์เซอร์อยู่แล้ว)
                 document.getElementById('formId').value = data.id;
                 document.getElementById('formModel').value = data.model;
                 document.getElementById('formPlate').value = data.plate;
@@ -953,7 +919,7 @@
                     const displayDate = formatDate(r.end_date);
 
                     if (diffDays < 0) {
-                        // Overdue (Red Theme like Image 2)
+                        // Overdue (Red Theme)
                         count++;
                         const overdueDays = Math.abs(diffDays);
                         htmlItem = `
@@ -965,10 +931,10 @@
                                             <span class="text-[#D92D20] font-bold text-base">เกินกำหนด ${overdueDays} วัน</span>
                                         </div>
                                         <div class="text-slate-700 font-bold text-sm mb-0.5 flex items-center">
-                                            <i class="fa-solid fa-motorcycle text-slate-400 mr-2 text-xs"></i> ${r.model} (${r.plate})
+                                            <i class="fa-solid fa-motorcycle text-slate-400 mr-2 text-xs"></i> ${escapeHTML(r.model)} (${escapeHTML(r.plate)})
                                         </div>
                                         <div class="text-slate-500 text-xs flex items-center">
-                                            <i class="fa-solid fa-user text-slate-400 mr-2 text-[10px]"></i> ลูกค้า: ${r.customer}
+                                            <i class="fa-solid fa-user text-slate-400 mr-2 text-[10px]"></i> ลูกค้า: ${escapeHTML(r.customer)}
                                         </div>
                                     </div>
                                     <div class="flex flex-col items-center justify-center bg-white border border-[#D92D20] rounded-lg px-2 py-1.5 min-w-[90px] shadow-sm">
@@ -979,7 +945,7 @@
                             </div>
                         `;
                     } else if (diffDays === 0) {
-                        // Due Today (Orange/Brown Theme like Image 2)
+                        // Due Today (Orange/Brown Theme)
                         count++;
                         htmlItem = `
                             <div class="p-4 border-b border-amber-100 bg-[#FFFAEB]">
@@ -990,10 +956,10 @@
                                             <span class="text-[#B54708] font-bold text-base">ครบกำหนดคืนวันนี้</span>
                                         </div>
                                         <div class="text-slate-700 font-bold text-sm mb-0.5 flex items-center">
-                                            <i class="fa-solid fa-motorcycle text-slate-400 mr-2 text-xs"></i> ${r.model} (${r.plate})
+                                            <i class="fa-solid fa-motorcycle text-slate-400 mr-2 text-xs"></i> ${escapeHTML(r.model)} (${escapeHTML(r.plate)})
                                         </div>
                                         <div class="text-slate-500 text-xs flex items-center">
-                                            <i class="fa-solid fa-user text-slate-400 mr-2 text-[10px]"></i> ลูกค้า: ${r.customer}
+                                            <i class="fa-solid fa-user text-slate-400 mr-2 text-[10px]"></i> ลูกค้า: ${escapeHTML(r.customer)}
                                         </div>
                                     </div>
                                     <div class="flex flex-col items-center justify-center bg-white border border-[#B54708] rounded-lg px-2 py-1.5 min-w-[90px] shadow-sm">
